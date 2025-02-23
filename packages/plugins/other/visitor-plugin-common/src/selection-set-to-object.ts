@@ -548,6 +548,7 @@ export class SelectionSetToObject<Config extends ParsedDocumentsConfig = ParsedD
     selectionNodes = [...selectionNodes];
     let inlineFragmentConditional = false;
     for (const selectionNode of selectionNodes) {
+      // 1. Handle Field or Directtives selection nodes
       if ('kind' in selectionNode) {
         if (selectionNode.kind === 'Field') {
           if (selectionNode.selectionSet) {
@@ -598,13 +599,31 @@ export class SelectionSetToObject<Config extends ParsedDocumentsConfig = ParsedD
         continue;
       }
 
+      // 2. Handle Fragment Spread nodes
+      // A Fragment Spread can be:
+      // - masked: the fields declared in the Fragment do not appear in the operation types
+      // - inline: the fields declared in the Fragment appear in the operation types
+
+      // 2a. If `inlineFragmentTypes` is 'combine' or 'mask', the Fragment Spread is masked by default
+      // In some cases, a masked node could be unmasked (i.e. treated as inline):
+      // - Fragment spread node is marked with Apollo `@unmask`, e.g. `...User @unmask`
       if (this._config.inlineFragmentTypes === 'combine' || this._config.inlineFragmentTypes === 'mask') {
-        fragmentsSpreadUsages.push(selectionNode.typeName);
-        continue;
+        let isMasked = true;
+
+        if (
+          this._config.customDirectives.apolloUnmask &&
+          selectionNode.fragmentDirectives.some(d => d.name.value === 'unmask')
+        ) {
+          isMasked = false;
+        }
+
+        if (isMasked) {
+          fragmentsSpreadUsages.push(selectionNode.typeName);
+          continue;
+        }
       }
 
-      // Handle Fragment Spreads by generating inline types.
-
+      // 2b. If the Fragment Spread is not masked, generate inline types.
       const fragmentType = this._schema.getType(selectionNode.onType);
 
       if (fragmentType == null) {
@@ -642,7 +661,9 @@ export class SelectionSetToObject<Config extends ParsedDocumentsConfig = ParsedD
       const isConditional = hasConditionalDirectives(field) || inlineFragmentConditional;
       const isOptional = options.unsetTypes;
       linkFields.push({
-        alias: field.alias ? this._processor.config.formatNamedField(field.alias.value, selectedFieldType) : undefined,
+        alias: field.alias
+          ? this._processor.config.formatNamedField(field.alias.value, selectedFieldType, isConditional, isOptional)
+          : undefined,
         name: this._processor.config.formatNamedField(field.name.value, selectedFieldType, isConditional, isOptional),
         type: realSelectedFieldType.name,
         selectionSet: this._processor.config.wrapTypeWithModifiers(
@@ -679,6 +700,7 @@ export class SelectionSetToObject<Config extends ParsedDocumentsConfig = ParsedD
         Array.from(primitiveAliasFields.values()).map(field => ({
           alias: field.alias.value,
           fieldName: field.name.value,
+          isConditional: hasConditionalDirectives(field),
         })),
         options.unsetTypes
       ),
