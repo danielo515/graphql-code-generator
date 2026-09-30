@@ -1,5 +1,16 @@
 # @graphql-codegen/client-preset
 
+## 6.2.1
+
+### Patch Changes
+
+- [#10995](https://github.com/dotansimha/graphql-code-generator/pull/10995)
+  [`e972b6d`](https://github.com/dotansimha/graphql-code-generator/commit/e972b6d2a2a388748887d87c54fbb66617fc8f44)
+  Thanks [@eddeee888](https://github.com/eddeee888)! - Fix type errors under `strict: true`. The
+  preset now throws a clear error when `schemaAst` is missing from the preset options, and the babel
+  plugin throws when a file has no filename. Both cases used to crash later with a less clear error.
+  Generated output is unchanged.
+
 ## 6.2.0
 
 ### Minor Changes
